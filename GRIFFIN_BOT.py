@@ -1,4 +1,4 @@
-# app.py - Red-themed Finance Chatbot with New Layout (CPU only)
+# app.py - Red-themed Finance Chatbot with GPU (No CUDA toolkit required)
 import streamlit as st
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -16,7 +16,7 @@ st.markdown("""
 <style>
 body, .stApp { background-color: #330000; color: #fff; }
 .main-header { font-size:3rem; color:#ff4d4d; text-align:center; font-weight:bold; margin-bottom:2rem; text-shadow: 2px 2px #660000; }
-.chat-container { background-color:#4d0000; border-radius:20px; padding:20px; height:70vh; overflow-y:auto; box-shadow: 0 4px 20px #ff0000; border:2px solid #ff1a1a; }
+.chat-container { background-color:#4d0000; border-radius:20px; padding:20px; height:65vh; overflow-y:auto; box-shadow: 0 4px 20px #ff0000; border:2px solid #ff1a1a; }
 .user-message { background-color:#660000; padding:15px; border-radius:15px; margin:12px 0; border-left:6px solid #ff1a1a; }
 .ai-message { background-color:#990000; padding:15px; border-radius:15px; margin:12px 0; border-left:6px solid #ff4d4d; }
 .stButton button { background-color:#ff1a1a; color:white; border-radius:12px; padding:10px 20px; font-weight:bold; border:none; transition:0.3s; width:100%; }
@@ -35,17 +35,28 @@ if "model" not in st.session_state:
     st.session_state.model = None
 if "tokenizer" not in st.session_state:
     st.session_state.tokenizer = None
+if "device" not in st.session_state:
+    st.session_state.device = "cpu"
 
 # ------------------ Model Loading ------------------ #
 @st.cache_resource(show_spinner=False)
 def load_model(model_path):
     try:
-        with st.spinner("🔄 Loading financial AI model (CPU)..."):
+        with st.spinner("🔄 Loading financial AI model..."):
             tokenizer = AutoTokenizer.from_pretrained(model_path)
+            
+            # Use GPU if available
+            if torch.cuda.is_available():
+                device = "cuda"
+                st.session_state.device = "cuda"
+            else:
+                device = "cpu"
+                st.session_state.device = "cpu"
+            
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
                 torch_dtype=torch.float16,
-                device_map="cpu",
+                device_map="auto",  # Automatically maps layers to GPU or CPU
                 trust_remote_code=True
             )
         return model, tokenizer
@@ -59,7 +70,7 @@ def generate_response(prompt, max_length=512, temperature=0.7):
         return "📊 Model not loaded."
     try:
         finance_prompt = f"As a financial expert, provide clear advice on:\n{prompt}\nResponse:"
-        inputs = st.session_state.tokenizer.encode(finance_prompt, return_tensors="pt").to("cpu")
+        inputs = st.session_state.tokenizer.encode(finance_prompt, return_tensors="pt").to(st.session_state.device)
         outputs = st.session_state.model.generate(
             inputs,
             max_length=max_length,
@@ -74,12 +85,12 @@ def generate_response(prompt, max_length=512, temperature=0.7):
 
 # ------------------ Main App ------------------ #
 def main():
-    st.markdown('<h1 class="main-header"> Finance AI Red Assistant</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🔥 Finance AI Red Assistant</h1>', unsafe_allow_html=True)
 
-    # New layout: left chat, right control panel
+    # Layout: left chat, right control panel
     left_col, right_col = st.columns([3, 1])
 
-    # ---------------- Left Column: Chat ---------------- #
+    # Left column: chat
     with left_col:
         st.markdown("### 💬 Chat")
         st.markdown('<div class="chat-container">', unsafe_allow_html=True)
@@ -90,7 +101,6 @@ def main():
                 st.markdown(f'<div class="ai-message"><strong>💹 AI Advisor:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Chat input
         if st.session_state.model_loaded:
             prompt = st.chat_input("Ask anything about finance...")
             if prompt:
@@ -101,7 +111,7 @@ def main():
         else:
             st.info("⏳ Load the model from the right panel to chat.")
 
-    # ---------------- Right Column: Controls ---------------- #
+    # Right column: controls
     with right_col:
         st.markdown("### ⚙ Model Setup")
         model_path = st.text_input("Model Path", value="./ibm-granite-model")
@@ -110,7 +120,7 @@ def main():
                 st.session_state.model, st.session_state.tokenizer = load_model(model_path)
                 if st.session_state.model:
                     st.session_state.model_loaded = True
-                    st.success("✅ Model loaded successfully!")
+                    st.success(f"✅ Model loaded on {st.session_state.device}!")
                 else:
                     st.error("❌ Failed to load model.")
             else:
