@@ -1,4 +1,4 @@
-# app.py - Red-themed Finance Chatbot with GPU (No CUDA toolkit required)
+# app.py - Red-themed Finance Chatbot with GPU (No CUDA toolkit) & Fixed Rerun
 import streamlit as st
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -56,7 +56,7 @@ def load_model(model_path):
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
                 torch_dtype=torch.float16,
-                device_map="auto",  # Automatically maps layers to GPU or CPU
+                device_map="auto",  # automatically maps layers to GPU or CPU
                 trust_remote_code=True
             )
         return model, tokenizer
@@ -90,7 +90,7 @@ def main():
     # Layout: left chat, right control panel
     left_col, right_col = st.columns([3, 1])
 
-    # Left column: chat
+    # ---------------- Left Column: Chat ---------------- #
     with left_col:
         st.markdown("### 💬 Chat")
         st.markdown('<div class="chat-container">', unsafe_allow_html=True)
@@ -101,17 +101,20 @@ def main():
                 st.markdown(f'<div class="ai-message"><strong>💹 AI Advisor:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
+        # Chat input
         if st.session_state.model_loaded:
             prompt = st.chat_input("Ask anything about finance...")
             if prompt:
                 st.session_state.messages.append({"role":"user","content":prompt})
                 response = generate_response(prompt)
                 st.session_state.messages.append({"role":"assistant","content":response})
-                st.experimental_rerun()
+                # Trigger rerun safely in latest Streamlit
+                st.session_state.update({})
+                st.stop()
         else:
             st.info("⏳ Load the model from the right panel to chat.")
 
-    # Right column: controls
+    # ---------------- Right Column: Controls ---------------- #
     with right_col:
         st.markdown("### ⚙ Model Setup")
         model_path = st.text_input("Model Path", value="./ibm-granite-model")
@@ -123,6 +126,8 @@ def main():
                     st.success(f"✅ Model loaded on {st.session_state.device}!")
                 else:
                     st.error("❌ Failed to load model.")
+                st.session_state.update({})
+                st.stop()
             else:
                 st.error("📁 Model path not found.")
 
@@ -132,7 +137,8 @@ def main():
         temperature = st.slider("Creativity", 0.1, 1.0, 0.7)
         if st.button("🗑 Clear Chat"):
             st.session_state.messages = []
-            st.experimental_rerun()
+            st.session_state.update({})
+            st.stop()
 
         st.divider()
         st.markdown("### 💡 Quick Examples")
@@ -148,7 +154,8 @@ def main():
                 st.session_state.messages.append({"role":"user","content":ex})
                 response = generate_response(ex, max_length, temperature)
                 st.session_state.messages.append({"role":"assistant","content":response})
-                st.experimental_rerun()
+                st.session_state.update({})
+                st.stop()
 
 if __name__ == "__main__":
     main()
